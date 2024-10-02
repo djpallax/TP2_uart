@@ -1,7 +1,7 @@
 module tb_baud_rate_gen;
 
     reg i_clk;
-    reg i_rst;
+    reg i_valid;
     wire baud_tick;
     
     baud_rate_gen
@@ -12,7 +12,7 @@ module tb_baud_rate_gen;
     uut
     (
         .i_clk(i_clk),
-        .i_rst(i_rst),
+        .i_valid(i_valid),
         .baud_tick(baud_tick)
     );
     
@@ -20,11 +20,11 @@ module tb_baud_rate_gen;
     
     initial begin
         i_clk = 0;
-        i_rst = 1;
+        i_valid = 0;
         
         #20 
         
-        i_rst = 0;
+        i_valid = 1;
         
         
         #1000000 $finish;
