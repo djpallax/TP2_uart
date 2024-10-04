@@ -1,6 +1,6 @@
 module uart_rx
 #(
-    parameter NB_DATA_BITS   = 8,     // Cantidad de bits por paquete
+    parameter NB_DATA   = 8,     // Cantidad de bits por paquete
     parameter FLAG_PARITY    = 2'b00, // 00 = sin paridad, 01 = paridad par, 10 = paridad impar
     parameter FLAG_STOP_BITS = 1'b1,  // 0 = sin bit de stop, 1 = con bit de stop
     parameter FLAG_SYNC      = 1'b1,   // 1 = asíncrono, 0 = síncrono
@@ -11,9 +11,9 @@ module uart_rx
 (
     input wire clk,                 // Clock que viene del generador de baudios (EL GENERADOR DEBE DETERMINAR SINCRONO O ASINCRONO)
     input wire i_rst,               // Boton reinicio
-    input wire rx,                  // Pin para escuchar la transmisión
+    input wire i_rx,                  // Pin para escuchar la transmisión
     input wire baud_tick,           // Tick de baud para la sincronización
-    output reg [NB_DATA_BITS-1:0] rx_data_out,      // Datos recibidos
+    output reg [NB_DATA-1:0] rx_data_out,      // Datos recibidos
     output reg rx_done,             // Flag para indicar fin de la recepción
     output reg o_valid              // Señal para que el generador de baudios comience
 );
@@ -66,7 +66,7 @@ module uart_rx
     // IDLE: espero el bit de inicio
             
             s_RX_IDLE: begin
-                if (rx == 0) begin      // Si vino un 0 arranco
+                if (i_rx == 0) begin      // Si vino un 0 arranco
                     next_state <= s_RX_START;
                     clock_count <= 0;
                     o_valid <= 0;
@@ -92,13 +92,13 @@ module uart_rx
             s_RX_DATA: begin
                 o_valid <= 1;
                 if (baud_tick && !baud_tick_last) begin // Solo actúa cuando llega un flanco de subida de baud_tick
-                    if (bit_count < NB_DATA_BITS) begin
-                        shift_data[bit_count] <= rx;    // Recibe el bit de datos
+                    if (bit_count < NB_DATA) begin
+                        shift_data[bit_count] <= i_rx;    // Recibe el bit de datos
                         bit_count <= bit_count + 1;
                     end
                     
                     else begin
-                        next_state <= s_RX_STOP;        // Llenaron los NB_DATA_BITS (probablemente 8), entonces termino
+                        next_state <= s_RX_STOP;        // Llenaron los NB_DATA (probablemente 8), entonces termino
                     end
                 end
             end
@@ -106,7 +106,7 @@ module uart_rx
     // STOP: Detecto el fin de la transmisión y reinicio
             
             s_RX_STOP: begin
-                if (rx == 1) begin  // Se detecta bit de parada después de NB_DATA_BITS bits de datos (Y PARIDAD???)
+                if (i_rx == 1) begin  // Se detecta bit de parada después de NB_DATA bits de datos (Y PARIDAD???)
                     rx_done <= 1;               // Aviso que hay un paquete nuevo
                     rx_data_out <= shift_data;  // Este es el paquete
                     o_valid <= 0;               // Ahorro energía (Apago el generador de ticks)
@@ -117,7 +117,7 @@ module uart_rx
                 else begin      // En caso de que llegue otra cosa que no sea bit de parada, error (IMPLEMENTAR BIT DE PARIDAD)
                     // Ignoro el paquete y reinicio (ESTÁ BIEN???)
                     rx_done <= 0;               // Info ta mal así que nada para leer
-                    rx_data_out <= {NB_DATA_BITS{1'b0}};    // Vacío el buffer 
+                    rx_data_out <= {NB_DATA{1'b0}};    // Vacío el buffer 
                     o_valid <= 0;               // Apago el generador
                     bit_count <= 0;
                     next_state <= s_RX_IDLE;    // Vuelve a IDLE
