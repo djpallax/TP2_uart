@@ -12,32 +12,32 @@ module uart_tx
 (
     input  wire               clk         , // Clock del sistema (EL GENERADOR DEBE DETERMINAR SINCRONO O ASINCRONO)
     input  wire               i_rst       , // Boton reinicio
-    input  wire [NB_DATA-1:0] o_rx_data   , // Datos a transmitir
+    input  wire [NB_DATA-1:0] i_data      , // Datos a transmitir
+    input  wire               i_new_data  , // Flag para que cargue el nuevo dato y comience
     output wire               o_tx        , // Salida para transmitir
     output wire               o_tx_done   , // Bit de transmisión finalizada
-    output wire               o_valid       // Señal para que el generador de baudios comience
+    output wire               o_valid       // Señal para que el generador de baudios comience y para que la interface espere
 
 );
 
-//    localparam [1:0]            // Definición de estados
-//        S_RX_IDLE  = 2'b00,     // Espera bit de inicio
-//        S_RX_START = 2'b01,     // Detecta el inicio, inicia el baud rate
-//        S_RX_DATA  = 2'b10,     // Escucha los datos
-//        S_RX_STOP  = 2'b11;     // Valida la trama
-
-    localparam integer DIVISOR = CLK_FREQ / BAUD_RATE;
+    localparam                    // Definición de estados
+        S_TX_IDLE     = 1'b0,     // Espera bit de inicio
+        S_TX_TRANSMIT = 1'b1;     // Detecta el inicio, inicia el baud rate
+    
+    //localparam integer DIVISOR = CLK_FREQ / BAUD_RATE;
 
     reg  [1:0] r_state, r_next_state ;   // Estado actual y próximo
     reg  [7:0] r_shift_data          ;   // Registro para almacenar los datos
     reg  [3:0] r_bit_count           ;   // Bit actual de la transmisión
     reg [31:0] r_clock_count         ;   // Contador de clk para dar inicio al generador de baudios
     reg        r_baud_tick_last      ;   // Para almacenar el estado anterior de baud tick
+    reg        r_tx                  ;   // Registro para copiar el valor de la salida
     
     //wire       w_baud_tick           ;   // Cable para conectar con el generador    (FIJATE CON EL CLK DE ARRIBA, ESTE SERÍA EL CLK DE TICKS)
     wire       i_baud_tick;
     
-    reg               f_rx_done ;
-    reg               f_valid   ;
+    reg               f_tx_done ;       // Flag para avisar a la interface que terminó de transmitir
+    reg               f_valid   ;       // Flag para la salida de valid del baud rate generator
     
     // Instancia de baud_rate_gen
     baud_rate_gen #(
@@ -51,14 +51,87 @@ module uart_tx
     );
     
     always @(posedge clk or posedge i_rst) begin
-    
+        
+        if (i_rst) begin
+        
+            r_state     <= S_TX_IDLE;    // Estado inicial es IDLE
+            r_bit_count <= 0;            // La cuenta de la posición va en 0
+            f_tx_done   <= 1'b1;         // Está listo para recibir (el reset se aplica a todo el sistema, es indistinto el valor)
+            r_tx        <= 1'b1;         // Línea TX en 1 por defecto
+            f_valid     <= 1'b0;         // Baud rate generator desactivado
+            
+        end 
+        
+        else begin
+            r_baud_tick_last <= i_baud_tick;    // Almacena el estado anterior de baud tick
+        
+            if (i_baud_tick && !r_baud_tick_last) begin     // Detecta flanco de subida de baud tick
+                r_state <= r_next_state;
+            end
+        end
+        
     end
     
     always @(posedge clk) begin
         r_state <= r_next_state;
         
-        
+        case (r_state)
+
+    // IDLE: Espero un nuevo dato para comenzar la transmisión
+
+            S_TX_IDLE: begin
+            
+                if(i_new_data) begin    // Nuevo dato para mostrar
+                
+                    f_tx_done <= 1'b0;    // Aviso a la interface que estoy transmitiendo
+                    r_tx      <= 1'b0;    // El valor de tx pasa a 0
+                    f_valid   <= 1'b1;    // Comienza el baud rate
+                    r_shift_data <= i_data; // Copio la info al registro
+                    
+                    if(i_baud_tick && !r_baud_tick_last) begin  // Si vino el flanco de tick
+                    
+                        r_bit_count  <= 0;              // El contador de posición se reinicia 
+                        r_next_state <= S_TX_TRANSMIT;  // Comienzo a transmitir
+                        
+                    end
+                    
+                end
+                
+                else begin          // Si no hay nuevo dato, mantengo la salida en 1
+                
+                    r_tx         <= 1'b1;   // Salida en 1
+                    f_tx_done    <= 1'b1;   // Flag de preparado en 1
+                    f_valid      <= 1'b0;   // Desactivo el generador de baud rate
+                    
+                end
+            end
+            
+    // TRANSMIT: Estado para la transmisión de datos
+    
+            S_TX_TRANSMIT: begin
+            
+                if(i_baud_tick && !r_baud_tick_last) begin  // Si vino el flanco de tick
+                
+                    if (r_bit_count < NB_DATA) begin        // Comienzo a leer el registro
+                        r_tx <= r_shift_data[r_bit_count];  // Copio bit a bit los datos a la salida
+                        r_bit_count <= r_bit_count + 1;     // Preparo el siguiente
+                    end
+                    
+                    else begin
+                    
+                        r_next_state <= S_TX_IDLE;        // Termino de transmitir, vuelvo al inicio
+                    
+                    end
+                end
+                
+            end
+            
+        endcase
     end
+    
+    assign o_tx_done = f_tx_done;
+    assign o_valid   = f_valid  ;
+    assign o_tx      = r_tx;
     
 endmodule
 
