@@ -53,3 +53,4 @@ module baud_rate_gen
     assign o_baud_tick = r_tick;
     
 endmodule
+

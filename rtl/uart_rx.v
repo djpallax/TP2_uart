@@ -169,3 +169,4 @@ module uart_rx
     assign o_valid   = f_valid  ;
     
 endmodule
+
