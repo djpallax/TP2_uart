@@ -1,0 +1,22 @@
+Funcionamiento módulo UART:
+
+El sistema consiste de los siguientes módulos:
+- UART RX: Módulo encargado de gestionar la recepción de la información.
+- UART TX: Módulo encargado de gestionar la transmisión de los resultados.
+- Baud Rate Generator: Módulo encargado de la generación de ticks para cada etapa UART.
+- Interface: Módulo que gestiona la comunicación UART con la ALU.
+- TOP: Gestiona parámetros globales, puertos y los interconecta.
+
+Descripción de un flujo de información por el sistema:
+
+El puerto de transmisión del dispositivo que quiere transmitir información al sistema, debe conectarse al puerto de recepción del sistema. El módulo RX se encontrará en el estado IDLE, tomando como lectura en su input i_rx un 1 lógico esperando el bit de start (que es cuando pasa a 0). Cuando esto sucede, la máquina de estados pasa al siguiente estado de start, esto lo que hace es iniciar una cuenta hasta la mitad de la duración del bit de start (aquí hay que revisar si hace falta volver a chequear que i_rx sea 0, para evitar muestreo por ruido). A partir de ese momento, se levanta la f_valid y se pasa al estado de data. Lo que hace esa flag es iniciar un submódulo que es el encargado de generar ticks de acuerdo al baud rate indicado y a la frecuencia del sistema, y este submódulo será el que actualizará la máquina de estados hasta que finalice la transmisión u ocurra un error. Una vez que han transcurrido los 8 bits de información, se pasa al estado de stop, donde este verificará que llegue el bit de parada correspondiente (quedaría implementar bit de paridad y otros). En caso de que todo salga bien, la flag f_rx_done se pone en 1 y se pasa la info a la salida. En caso de que sea 0, sólo se reinician los registros.
+
+Una vez que la flag se puso en 1, el módulo interface, que se encuentra en el estado wait A, esperará a que ocurra un flanco de subida en en la flag de rx done (por eso el if con i_rx_uart_done y f_last_rx), y tomará los 8 bits de salida de el módulo de recepción para guardarlos en data_a, luego pasa al siguiente estado. Realiza esto con data a, luego con data b, y por último con op, que cuando esto ocurre, pasa al estado de show res, donde levanta la flag f_show_rx por un ciclo de reloj hasta volver al primer estado, con esto se logra que la alu actualice el resultado dependiendo de las entradas y luego lo mantenga congelado hasta procesar el siguiente.
+
+(A implementar: Camino de la transmisión)
+
+Cuando la ALU tiene sus valores cargados en las entradas, actualiza la salida con el resultado (VER CUÁNTO DEMORA), el estado de la interface de show res debe levantar una flag que le de inicio a una máquina de 2 estados: El primer estado es de IDLE, va a estar esperando a que la ALU reciba algo a sus entradas, y luego cuando llegue un flanco (CAPAZ SE PUEDE USAR UN NEGEDGE PARA QUE LE DE TIEMPO A PROCESAR) pasar al siguiente estado, donde le dará este resultado a el módulo de transmisión TX, para que este pueda enviarlo.
+
+El módulo de transmisión cuando tenga una entrada nueva, va a recibir una flag desde el 2do estado de la interface, para saber que tiene que empezar a transmitir. Este primero pondrá en 0 el puerto de transmisión, iniciará otro submódulo de generador de baudrate, luego transmitirá bit a bit la información, transmite el bit de stop y vuelve a un estado de espera, en donde tendrá que levantar una flag para indicar que ya ha terminado la transmisión hasta que llegue un nuevo dato.
+
+De esta forma que está implementado, el tiempo para transmitir debería ser cómodo ya que tiene que esperar 3 tramas UART en la recepción para transmitir solamente 1. Así también como la comunicación puede ser full duplex debido a que cada parte tiene su propio baud rate generator. Se podría modificar la interfaz para que realice tomas de decisiones, así también se podría instanciar otra etapa extra de UART al sistema.

@@ -10,11 +10,13 @@ module uart_rx
     parameter BAUD_RATE = 115200        // Baud Rate de operación
 )
 (                   // MMM REVISAR ESTE CLK
-    input wire                clk         , // Clock que viene del generador de baudios (EL GENERADOR DEBE DETERMINAR SINCRONO O ASINCRONO)
+    input wire                clk         , // Clock del sistema (EL GENERADOR DEBE DETERMINAR SINCRONO O ASINCRONO)
     input wire                i_rst       , // Boton reinicio
-    input wire                i_rx        , // Pin para escuchar la transmisión
-    input wire                i_baud_tick , // Tick de baud para la sincronización
+    input wire                i_rx        , // Entrada para escuchar la transmisión
+    //input wire                i_baud_tick , // Tick de baud para la sincronización
     output wire [NB_DATA-1:0] o_rx_data   , // Datos recibidos
+    
+        // REVISAR IMPLEMENTACION RX DONE, DEBERÍA SER 1 TODO EL TIEMPO Y CUANDO ESTÁ ESCUCHANDO BAJA A 
     output wire               o_rx_done   , // Flag para indicar fin de la recepción
     output wire               o_valid       // Señal para que el generador de baudios comience
 );
@@ -33,8 +35,8 @@ module uart_rx
     reg [31:0] r_clock_count         ;   // Contador de clk para dar inicio al generador de baudios
     reg        r_baud_tick_last      ;   // Para almacenar el estado anterior de baud tick
     
-    wire       w_baud_tick           ;   // Cable para conectar con el generador    (FIJATE CON EL CLK DE ARRIBA, ESTE SERÍA EL CLK DE TICKS)
-    
+    //wire       w_baud_tick           ;   // Cable para conectar con el generador    (FIJATE CON EL CLK DE ARRIBA, ESTE SERÍA EL CLK DE TICKS)
+    wire       i_baud_tick;
         // Registros temporales para las salidas
     reg [NB_DATA-1:0] t_rx_data ;
     reg               f_rx_done ;
@@ -50,7 +52,7 @@ module uart_rx
     rx_baud_rate_gen (
         .i_clk      (clk)       ,
         .i_valid    (f_valid)   ,
-        .o_baud_tick(w_baud_tick)   // Tick generado
+        .o_baud_tick(i_baud_tick)   // Tick generado
     );
     
     
@@ -74,9 +76,10 @@ module uart_rx
             end
         end
     end
+        
+
     
-    
-    
+    // Bloque secuencial
     always @(posedge clk) begin
         r_state <= r_next_state;
         
@@ -91,20 +94,31 @@ module uart_rx
                     r_next_state <= S_RX_START;
                     r_clock_count <= 0;
                     f_valid <= 0;
+                    
+                    f_rx_done <= 0;     // Revisar si está bien dentro del if o fuera, o si necesita delay
+                    
                 end
             end
             
     // START: Configuro para empezar a escuchar
             
             S_RX_START: begin
-                if (r_clock_count == (DIVISOR - 1)/2) begin 
-                    r_next_state <= S_RX_DATA;
-                    r_bit_count <= 0;         // Preparo el contador de bits
-                    f_valid <= 1;       // Inicio el generador de ticks
-                end
+                if (i_rx == 0) begin    // Si la entrada de escucha sigue en 0, comienzo (Revisar, puede ocasionar problemas)(creo que iba en el if de abajo, como un and)
                 
-                else begin
-                    r_clock_count <= r_clock_count + 1;
+                    if (r_clock_count == (DIVISOR - 1)/2) begin     // Espero hasta la mitad del bit de Start
+                        r_next_state <= S_RX_DATA;
+                        r_bit_count <= 0;         // Preparo el contador de bits
+                        f_valid <= 1;       // Inicio el generador de ticks
+                    end
+                
+                    else begin              // Si no llego a la mitad del bit de Start, acumulo
+                        r_clock_count <= r_clock_count + 1;
+                    end
+                
+                end 
+                
+                else begin          // Si la entrada de escucha es 1, hay algo mal, reinicio
+                    r_next_state <= S_RX_IDLE;
                 end
             end
             

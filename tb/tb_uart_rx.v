@@ -5,14 +5,14 @@ module uart_rx_tb;
     // Parámetros
     localparam CLK_FREQ = 100000000; // 100 MHz clock
     localparam BAUD_RATE = 115200;   // 115200 baud rate
-    localparam NB_DATA_BITS = 8;     // 8 bits de datos
+    localparam NB_DATA = 8;          // 8 bits de datos
 
     // Señales
     reg clk;
     reg i_rst;
-    reg rx;
+    reg i_rx;
     wire baud_tick;
-    wire [NB_DATA_BITS-1:0] rx_data_out;
+    wire [NB_DATA-1:0] rx_data_out;
     wire rx_done;
     wire o_valid;
 
@@ -23,21 +23,21 @@ module uart_rx_tb;
     ) baud_gen_inst (
         .i_clk(clk),
         .i_valid(o_valid),  // Comienza a generar ticks cuando o_valid es 1
-        .baud_tick(baud_tick)
+        .o_baud_tick(baud_tick)
     );
 
     // Instancia del módulo uart_rx
     uart_rx #(
-        .NB_DATA_BITS(NB_DATA_BITS),
+        .NB_DATA(NB_DATA),
         .CLK_FREQ(CLK_FREQ),
         .BAUD_RATE(BAUD_RATE)
     ) uart_rx_inst (
         .clk(clk),
         .i_rst(i_rst),
-        .rx(rx),
-        .baud_tick(baud_tick),
-        .rx_data_out(rx_data_out),
-        .rx_done(rx_done),
+        .i_rx(i_rx),
+        .i_baud_tick(baud_tick),
+        .o_rx_data(rx_data_out),
+        .o_rx_done(rx_done),
         .o_valid(o_valid)
     );
 
@@ -49,7 +49,7 @@ module uart_rx_tb;
         // Inicialización de señales
         clk = 0;
         i_rst = 1;
-        rx = 1;           // Línea de RX inicialmente en reposo (alta)
+        i_rx = 1;           // Línea de RX inicialmente en reposo (alta)
         #100;
         
         // Desactivar reset
@@ -81,17 +81,17 @@ module uart_rx_tb;
         integer i;
         begin
             // Enviar el bit de inicio (start bit, 0)
-            rx = 0;
+            i_rx = 0;
             #(8680);  // Tiempo para un bit a 115200 baud rate (~8680ns por bit)
 
             // Enviar los 8 bits de datos (LSB primero)
             for (i = 0; i < 8; i = i + 1) begin
-                rx = data[i];
+                i_rx = data[i];
                 #(8680);  // Tiempo de un bit
             end
 
             // Enviar el bit de parada (stop bit, 1)
-            rx = 1;
+            i_rx = 1;
             #(8680);  // Tiempo de un bit
         end
     endtask

@@ -15,8 +15,19 @@ module top_uart
     input  wire       i_rst    ,    // Entrada de reset
     input  wire       i_uart_rx,    // Conexión de entrada de datos uart
     output wire       o_uart_tx,    // Conexión de salida de datos uart
-    output wire [1:0] o_uart_led    // Leds de comunicación uart    (AGREGO DE ESTADOS? PARA INTERFAZ)
+    output wire [2:0] o_uart_led    // Leds de comunicación uart    (AGREGO DE ESTADOS? PARA INTERFAZ)
 );
+
+
+    // ACÁ CREAR LOS REGISTROS PARA INTERCONECTAR LOS MÓDULOS
+    // PARA LOS REG QUE INTERCONECTAN, USAR w_... para un wire
+    
+    wire [NB_DATA-1:0] w_data_a;  // Wire para conectar data a de interface a entrada de alu
+    wire [NB_DATA-1:0] w_data_b;  // Wire para conectar data b de interface a entrada de alu
+    wire [NB_OP  -1:0] w_op;      // Wire para conectar op de interface a alu
+    wire [NB_DATA-1:0] w_rx_data; // Wire para conectar info de rx a la interface
+    wire               w_rx_done; // Wire para la flag de recepción lista
+
 
     // Instancia RX
 
@@ -28,12 +39,14 @@ module top_uart
         .F_RX_SYNC      (F_RX_SYNC)
     )
     rx_instance (
-        .i_rx(i_uart_rx)        // Pin de entrada de recepción uart
+        .clk       (clk)      ,
+        .i_rst     (i_rst)    ,
+        .i_rx      (i_uart_rx),     // Pin de entrada de recepción uart
+        .o_rx_data (w_rx_data),
+        .o_rx_done (w_rx_done)
     );
     
-    // ACÁ CREAR LOS REGISTROS PARA INTERCONECTAR LOS MÓDULOS
-    // PARA LOS REG QUE INTERCONECTAN, USAR w_... para un wire
-    
+
     // Instancia TX
     
 //    uart_tx #(
@@ -46,23 +59,35 @@ module top_uart
 
     // Instancia Interfaz
 
-//    interface #(
-//        .NB_DATA(NB_DATA),
-//        .NB_OP  (NB_OP)
-//    )
-//    interface_instance (
-//        .i_rx(i_uart_rx)
-//    );
+    interface #(
+        .NB_DATA(NB_DATA),
+        .NB_OP  (NB_OP)
+    )
+    interface_instance (
+        .clk            (clk)      ,
+        .i_rst          (i_rst)    ,
+        .i_rx_uart_data (w_rx_data),
+        .i_rx_uart_done (w_rx_done),
+        .o_leds         (o_uart_led),
+        .o_update_alu   (w_valid)  ,
+        .o_data_a       (w_data_a) ,
+        .o_data_b       (w_data_b) ,
+        .o_op           (w_op)
+    );
 
     // Instancia ALU
     
-//    ALU #(
-//        .NB_DATA(NB_DATA),
-//        .NB_OP  (NB_OP)
-//    )
-//    alu_instance (
-//        .i_rx(i_uart_rx)
-//    );
+    ALU #(
+        .NB_DATA(NB_DATA),
+        .NB_OP  (NB_OP)
+    )
+    alu_instance (
+        .i_valid  (w_valid)  ,          // CREAR VALID ENTRE INTERFAZ Y ALU
+        .i_data_a (w_data_a) ,          // SALIDA DE INTERFAZ DE 8 BITS, ENTRADA DE ALU DE 8 BITS
+        .i_data_b (w_data_b) ,          // SALIDA DE INTERFAZ DE 8 BITS, ENTRADA DE ALU DE 8 BITS
+        .i_op     (w_op)     ,          // Operación a realizar, recibida también por UART
+        .o_result (w_result)            // Resultado de la ALU, salida de 8 bits, se conecta a una entrada en la interface
+    );
 
     // Instancia Baud Rate Generator
     
