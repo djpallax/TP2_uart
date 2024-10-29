@@ -12,7 +12,11 @@ module interface
     output wire [NB_DATA-1:0] o_data_b,                 // Valor 2 para la ALU
     output wire [NB_DATA-1:0] o_op,                     // Operador para la ALU
     output wire [2:0]         o_leds,                   // Leds de estado
-    output wire o_update_alu       // SERIA EL VALID????
+    output wire o_update_alu,       // SERIA EL VALID????
+    
+    input  wire [NB_DATA-1:0] i_result,                // Resultado de la ALU
+    output wire [NB_DATA-1:0] o_tx_uart_data           // Información a transmitir por UART TX
+
 );
 
     localparam [1:0]
@@ -21,11 +25,18 @@ module interface
         S_WAIT_OP       = 2'b10,  // Esperando el operador        CONVIENE QUE SEA OPERANDO 1, 2 Y OP, O QUE SEA 1, OP Y 2? USAR LEDS PARA MOSTRAR ESTADO
         S_SHOW_RES      = 2'b11;  // Envía el resultado por uart tx
         
-    reg [1:0] r_state, r_next_state;    // Estado actual y próximo
+        //REVISAR
+    localparam
+        S_WAIT_RES      = 1'b0,   // Estado para esperar un nuevo resultado de la ALU
+        S_NEW_DATA      = 1'b1;   // Estado para enviar un nuevo dato a el módulo de transmisión
+        
+    reg [1:0] r_state, r_next_state;    // Estado actual y próximo de la recepción
+    reg [1:0] t_state, t_next_state;    // Estado actual y próximo de la recepción
 
     reg signed [NB_DATA - 1 : 0] data_a;   // Registro para almacenar el primer operando
     reg signed [NB_DATA - 1 : 0] data_b;   // Registro para almacenar el segundo operando
     reg        [NB_OP   - 1 : 0] op    ;   // Registro para almacenar el operador
+    reg signed [NB_DATA - 1 : 0] result;   // Registro para almacenar el resultado de la ALU
     
     reg f_show_rx;      // Flag para alternar el valid en la alu
     reg f_last_rx;      // Estado anterior de rx_done
@@ -63,7 +74,8 @@ module interface
     end
     
     
-    
+// Always para el RX
+
     always @(posedge clk) begin
         r_state <= r_next_state;
         
@@ -114,13 +126,17 @@ module interface
             
         endcase
     end
+    
+// Always para el TX
+
+
 
 assign o_update_alu = f_show_rx ? 1 : 0;    // Si está habilitado, manda a la ALU a operar
 assign o_data_a = data_a;       // Los datos serán constantes, el flag de valid manda a operar
 assign o_data_b = data_b;
 assign o_op = op;
 assign o_leds = leds;
-
+assign o_tx_uart_data = result; // Resultado de la ALU se copia a la salida
 
 endmodule
 

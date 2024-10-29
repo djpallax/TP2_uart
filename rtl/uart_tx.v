@@ -112,7 +112,7 @@ module uart_tx
             
                 if(i_baud_tick && !r_baud_tick_last) begin  // Si vino el flanco de tick
                 
-                    if (r_bit_count < NB_DATA) begin        // Comienzo a leer el registro
+                    if (r_bit_count < NB_DATA) begin        // Comienzo a leer el registro              REVISAR SI TRANSMITE BIEN EL ÚLTIMO BIT
                         r_tx <= r_shift_data[r_bit_count];  // Copio bit a bit los datos a la salida
                         r_bit_count <= r_bit_count + 1;     // Preparo el siguiente
                     end

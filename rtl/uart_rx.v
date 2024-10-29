@@ -16,7 +16,7 @@ module uart_rx
     //input wire                i_baud_tick , // Tick de baud para la sincronización
     output wire [NB_DATA-1:0] o_rx_data   , // Datos recibidos
     
-        // REVISAR IMPLEMENTACION RX DONE, DEBERÍA SER 1 TODO EL TIEMPO Y CUANDO ESTÁ ESCUCHANDO BAJA A 
+        // REVISAR IMPLEMENTACION RX DONE, DEBERÍA SER 1 TODO EL TIEMPO Y CUANDO ESTÁ ESCUCHANDO BAJA A 0
     output wire               o_rx_done   , // Flag para indicar fin de la recepción
     output wire               o_valid       // Señal para que el generador de baudios comience
 );
