@@ -14,8 +14,10 @@ module interface
     output wire [2:0]         o_leds,                   // Leds de estado
     output wire o_update_alu,       // SERIA EL VALID????
     
-    input  wire [NB_DATA-1:0] i_result,                // Resultado de la ALU
-    output wire [NB_DATA-1:0] o_tx_uart_data           // Información a transmitir por UART TX
+    input  wire [NB_DATA-1:0] i_result,                 // Resultado de la ALU
+    input  wire               i_tx_done   ,             // Flag de transmisión lista
+    output wire               o_new_data,               // Flag para avisarle al transmisor que hay un nuevo dato
+    output wire [NB_DATA-1:0] o_tx_uart_data            // Información a transmitir por UART TX
 
 );
 
@@ -41,6 +43,8 @@ module interface
     reg f_show_rx;      // Flag para alternar el valid en la alu
     reg f_last_rx;      // Estado anterior de rx_done
     reg [2:0] leds;     // Estado de leds
+    reg f_new_data;     // Flag para informarle al transmisor que hay un nuevo dato
+    
 //    // Instanciación de la ALU
 //    ALU #(
 //        .NB_DATA(NB_DATA ),
@@ -129,14 +133,63 @@ module interface
     
 // Always para el TX
 
+    always @(negedge clk) begin         // Distinto del posedge para darle un tiempo a la ALU a procesar
+        t_state <= t_next_state;
+        
+        case(t_state)
+            
+        // Esperando un nuevo resultado
+        
+            S_NEW_DATA: begin
+            
+                // Reviso que f_show_rx esté en 1 para pasar al siguiente estado (o sea, se transmitieron los datos a la ALU)
+                // Si está en 0, sigo esperando
+                
+                if (f_show_rx) begin
+                    t_next_state <= S_WAIT_RES;
+                end
+                
+                f_new_data <= 1'b0;         // Flag de new data en 0
+                //FIN
+                
+            end
+            
+        // Transmitiendo el resultado
+            
+            S_WAIT_RES: begin
+                
+                if (i_tx_done) begin
+                    result <= i_result;
+                    f_new_data <= 1'b1;     // Flag de new data en 1, tx lee y comienza a copiar
+                end
+                
+                else begin
+                    f_new_data <= 0;
+                    
+                end
+                
+                // Reviso que TX esté listo para transmitir
+                // Si está listo, copio lo que venga en i_result a result, y levanto la flag de nuevo dato para el TX
+                // Me quedo esperando a que TX tenga un nuevo flanco de listo para transmitir
+                
+                // En esta parte podría ver de implementar un buffer por si tx no está listo
+                
+                // FIN
+                
+                
+               
+            end
+            
+        endcase
+    end
 
-
-assign o_update_alu = f_show_rx ? 1 : 0;    // Si está habilitado, manda a la ALU a operar
-assign o_data_a = data_a;       // Los datos serán constantes, el flag de valid manda a operar
-assign o_data_b = data_b;
-assign o_op = op;
-assign o_leds = leds;
-assign o_tx_uart_data = result; // Resultado de la ALU se copia a la salida
+assign o_update_alu     = f_show_rx ? 1 : 0;    // Si está habilitado, manda a la ALU a operar
+assign o_data_a         = data_a;       // Los datos serán constantes, el flag de valid manda a operar
+assign o_data_b         = data_b;
+assign o_op             = op;
+assign o_leds           = leds;
+assign o_tx_uart_data   = result;       // Resultado de la ALU se copia a la salida
+assign o_new_data       = f_new_data;   // Flag a tx, informa nueva data
 
 endmodule
 

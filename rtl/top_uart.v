@@ -27,6 +27,8 @@ module top_uart
     wire [NB_OP  -1:0] w_op;      // Wire para conectar op de interface a alu
     wire [NB_DATA-1:0] w_rx_data; // Wire para conectar info de rx a la interface
     wire               w_rx_done; // Wire para la flag de recepción lista
+    wire [NB_DATA-1:0] w_tx_data; // Wire para conectar info de la interface a tx
+    wire               w_tx_done; // Wire para la flag de transmisión lista 
 
 
     // Instancia RX
@@ -49,13 +51,18 @@ module top_uart
 
     // Instancia TX
     
-//    uart_tx #(
-//        .NB_DATA(NB_DATA),
-//        .NB_OP  (NB_OP)
-//    )
-//    tx_instance (
-//        .o_tx(o_uart_tx)
-//    );
+    uart_tx #(
+        .NB_DATA        (NB_DATA)       ,
+        .NB_OP          (NB_OP)         ,
+        .F_RX_PARITY    (F_RX_PARITY)   ,
+        .F_RX_STOP_BITS (F_RX_STOP_BITS),
+        .F_RX_SYNC      (F_RX_SYNC)
+    )
+    tx_instance (
+        .o_tx           (o_uart_tx),
+        .i_tx_done      (w_tx_done),
+        .i_data         (w_tx_data)
+    );
 
     // Instancia Interfaz
 
@@ -72,7 +79,8 @@ module top_uart
         .o_update_alu   (w_valid)  ,
         .o_data_a       (w_data_a) ,
         .o_data_b       (w_data_b) ,
-        .o_op           (w_op)
+        .o_op           (w_op),
+        .o_tx_uart_data (w_tx_data)
     );
 
     // Instancia ALU
