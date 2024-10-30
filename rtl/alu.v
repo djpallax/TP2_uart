@@ -15,6 +15,8 @@ module ALU
     parameter NB_OP   = 6         // Cantidad de bits para la operación
 )
 (
+    input  wire                           clk,      // Clock para el reinicio
+    input  wire                           i_rst,    // Reset de registros
     input  wire                           i_valid,    // valid para cambiar la salida
     input  wire signed  [NB_DATA - 1 : 0] i_data_a,   // 8 bits para a
     input  wire signed  [NB_DATA - 1 : 0] i_data_b,   // 8 bits para b
@@ -24,6 +26,16 @@ module ALU
  
     reg signed [NB_DATA-1:0] result                    ;
     reg signed [NB_DATA-1:0] feedback = {NB_DATA{1'b0}};
+
+
+
+    always @(posedge clk or posedge i_rst) begin
+        if (i_rst) begin
+            result <= {NB_DATA{1'b0}};   // Pone result a 0
+            feedback <= {NB_DATA{1'b0}}; // Pone feedback a 0
+        end
+    end
+
 
 always @(*) 
 begin

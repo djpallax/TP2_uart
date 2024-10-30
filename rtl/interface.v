@@ -29,8 +29,8 @@ module interface
         
         //REVISAR
     localparam
-        S_WAIT_RES      = 1'b0,   // Estado para esperar un nuevo resultado de la ALU
-        S_NEW_DATA      = 1'b1;   // Estado para enviar un nuevo dato a el módulo de transmisión
+        S_NEW_DATA      = 1'b0,   // Estado que cambia con un nuevo resultado de la ALU
+        S_WAIT_RES      = 1'b1;   // Estado que espera a TX a que transmita
         
     reg [1:0] r_state, r_next_state;    // Estado actual y próximo de la recepción
     reg [1:0] t_state, t_next_state;    // Estado actual y próximo de la recepción
@@ -44,27 +44,26 @@ module interface
     reg f_last_rx;      // Estado anterior de rx_done
     reg [2:0] leds;     // Estado de leds
     reg f_new_data;     // Flag para informarle al transmisor que hay un nuevo dato
-    
-//    // Instanciación de la ALU
-//    ALU #(
-//        .NB_DATA(NB_DATA ),
-//        .NB_OP  (NB_OP   )
-//    ) alu_instance (
-//        .i_data_a(data_a ),
-//        .i_data_b(data_b ),
-//        .i_op    (op     ),
-//        .i_valid (i_valid),
-//        .o_result(o_led  )
-//    );
-    
+    reg f_prev_tx_done; // Flag para almacenar el último estado de tx done
+
+
     always @(posedge clk or posedge i_rst) begin
         if (i_rst) begin
             r_state <= S_WAIT_A;
             r_next_state <= S_WAIT_A;
+            t_state <= S_NEW_DATA;
+            t_next_state <= S_NEW_DATA;
+            
             data_a <= 0;        // {NB_DATA{1'b0}};
             data_b <= 0;        // {NB_DATA{1'b0}};
             op <= 0;            // {NB_OP{1'b0}};
             leds <= 0;
+            result <= 0;        // {NB_DATA{1'b0}};
+            
+            f_show_rx <= 0;
+            f_last_rx <= 0;
+            f_new_data <= 0;
+            f_prev_tx_done <= 0;
         end
         
         else begin
@@ -76,6 +75,7 @@ module interface
         end
         
     end
+    
     
     
 // Always para el RX
@@ -131,6 +131,8 @@ module interface
         endcase
     end
     
+    
+    
 // Always para el TX
 
     always @(negedge clk) begin         // Distinto del posedge para darle un tiempo a la ALU a procesar
@@ -158,16 +160,6 @@ module interface
             
             S_WAIT_RES: begin
                 
-                if (i_tx_done) begin
-                    result <= i_result;
-                    f_new_data <= 1'b1;     // Flag de new data en 1, tx lee y comienza a copiar
-                end
-                
-                else begin
-                    f_new_data <= 0;
-                    
-                end
-                
                 // Reviso que TX esté listo para transmitir
                 // Si está listo, copio lo que venga en i_result a result, y levanto la flag de nuevo dato para el TX
                 // Me quedo esperando a que TX tenga un nuevo flanco de listo para transmitir
@@ -176,8 +168,18 @@ module interface
                 
                 // FIN
                 
+                if (i_tx_done) begin
+                    result <= i_result;
+                    f_new_data <= 1'b1;     // Flag de new data en 1, tx lee y comienza a copiar
+                    f_prev_tx_done <= 1'b1; // Estado anterior fue 1, entonces aseguro que en el siguiente if copie el dato
+                end
                 
-               
+                else if (f_prev_tx_done) begin
+                    f_new_data <= 0;        
+                    f_prev_tx_done <= 0;
+                    t_next_state <= S_NEW_DATA;
+                end
+                
             end
             
         endcase

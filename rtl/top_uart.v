@@ -29,6 +29,8 @@ module top_uart
     wire               w_rx_done; // Wire para la flag de recepción lista
     wire [NB_DATA-1:0] w_tx_data; // Wire para conectar info de la interface a tx
     wire               w_tx_done; // Wire para la flag de transmisión lista 
+    wire [NB_DATA-1:0] w_result;  // Conecta salida de la ALU con entrada de la interface
+    wire               w_new_data;// Informa a TX que la interface tiene un nuevo valor
 
 
     // Instancia RX
@@ -59,12 +61,15 @@ module top_uart
         .F_RX_SYNC      (F_RX_SYNC)
     )
     tx_instance (
+        .clk            (clk)      ,
+        .i_rst          (i_rst)    ,
         .o_tx           (o_uart_tx),
-        .i_tx_done      (w_tx_done),
-        .i_data         (w_tx_data)
+        .o_tx_done      (w_tx_done),
+        .i_data         (w_tx_data),
+        .i_new_data     (w_new_data)
     );
 
-    // Instancia Interfaz
+    // Instancia Interface
 
     interface #(
         .NB_DATA(NB_DATA),
@@ -80,7 +85,10 @@ module top_uart
         .o_data_a       (w_data_a) ,
         .o_data_b       (w_data_b) ,
         .o_op           (w_op),
-        .o_tx_uart_data (w_tx_data)
+        .o_tx_uart_data (w_tx_data),
+        .i_result       (w_result),
+        .o_new_data     (w_new_data),
+        .i_tx_done      (w_tx_done)
     );
 
     // Instancia ALU
@@ -90,6 +98,8 @@ module top_uart
         .NB_OP  (NB_OP)
     )
     alu_instance (
+        .clk      (clk),
+        .i_rst    (i_rst),
         .i_valid  (w_valid)  ,          // CREAR VALID ENTRE INTERFAZ Y ALU
         .i_data_a (w_data_a) ,          // SALIDA DE INTERFAZ DE 8 BITS, ENTRADA DE ALU DE 8 BITS
         .i_data_b (w_data_b) ,          // SALIDA DE INTERFAZ DE 8 BITS, ENTRADA DE ALU DE 8 BITS

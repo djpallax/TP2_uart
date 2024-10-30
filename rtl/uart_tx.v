@@ -44,7 +44,7 @@ module uart_tx
         .CLK_FREQ (CLK_FREQ),
         .BAUD_RATE(BAUD_RATE)
     )
-    rx_baud_rate_gen (
+    tx_baud_rate_gen (
         .i_clk      (clk)       ,
         .i_valid    (f_valid)   ,
         .o_baud_tick(i_baud_tick)   // Tick generado
@@ -55,10 +55,12 @@ module uart_tx
         if (i_rst) begin
         
             r_state     <= S_TX_IDLE;    // Estado inicial es IDLE
+            r_next_state     <= S_TX_IDLE;
             r_bit_count <= 0;            // La cuenta de la posición va en 0
             f_tx_done   <= 1'b1;         // Está listo para recibir (el reset se aplica a todo el sistema, es indistinto el valor)
             r_tx        <= 1'b1;         // Línea TX en 1 por defecto
             f_valid     <= 1'b0;         // Baud rate generator desactivado
+            r_shift_data  <= 0;
             
         end 
         
@@ -67,10 +69,12 @@ module uart_tx
         
             if (i_baud_tick && !r_baud_tick_last) begin     // Detecta flanco de subida de baud tick
                 r_state <= r_next_state;
-            end
+            end                             // Revisar esto ya que usamos clk y ticks, creo que el if no haría falta
         end
         
     end
+    
+    
     
     always @(posedge clk) begin
         r_state <= r_next_state;
@@ -83,14 +87,23 @@ module uart_tx
             
                 if(i_new_data) begin    // Nuevo dato para mostrar
                 
-                    f_tx_done <= 1'b0;    // Aviso a la interface que estoy transmitiendo
-                    r_tx      <= 1'b0;    // El valor de tx pasa a 0
+                    //f_tx_done <= 1'b0;    // Aviso a la interface que estoy transmitiendo
+                    //r_tx      <= 1'b0;    // El valor de tx pasa a 0
                     f_valid   <= 1'b1;    // Comienza el baud rate
                     r_shift_data <= i_data; // Copio la info al registro
                     
                     if(i_baud_tick && !r_baud_tick_last) begin  // Si vino el flanco de tick
-                    
-                        r_bit_count  <= 0;              // El contador de posición se reinicia 
+                        
+                        //f_tx_done <= 1'b0;    // Aviso a la interface que estoy transmitiendo
+                        
+                        r_tx      <= 1'b0;    // El valor de tx pasa a 0
+                        
+                        // TOCAR ESTO PARA CAMBIAR EL ORDEN
+                        
+                        //r_bit_count  <= 0;              // El contador de posición se reinicia 
+                        r_bit_count <= NB_DATA;
+                        
+                        
                         r_next_state <= S_TX_TRANSMIT;  // Comienzo a transmitir
                         
                     end
@@ -109,12 +122,19 @@ module uart_tx
     // TRANSMIT: Estado para la transmisión de datos
     
             S_TX_TRANSMIT: begin
-            
+                
+                f_valid      <= 1'b1;   // Valid se mantiene en 1 para generar ticks
+                f_tx_done    <= 1'b0;   // Flag de preparado en 0, está transmitiendo
+                
                 if(i_baud_tick && !r_baud_tick_last) begin  // Si vino el flanco de tick
                 
-                    if (r_bit_count < NB_DATA) begin        // Comienzo a leer el registro              REVISAR SI TRANSMITE BIEN EL ÚLTIMO BIT
-                        r_tx <= r_shift_data[r_bit_count];  // Copio bit a bit los datos a la salida
-                        r_bit_count <= r_bit_count + 1;     // Preparo el siguiente
+                // REVISAR SI TRANSMITE BIEN EL ÚLTIMO BIT (tiene que ver con el bit de stop)
+                // REVISAR EL ORDEN MSB A LSB
+                
+                    //if (r_bit_count < NB_DATA - 1) begin        // Comienzo a leer el registro     
+                    if (r_bit_count > 0) begin         
+                        r_tx <= r_shift_data[((NB_DATA - 1) - (r_bit_count - 1))];  // Copio bit a bit los datos a la salida
+                        r_bit_count <= r_bit_count - 1;     // Preparo el siguiente
                     end
                     
                     else begin
