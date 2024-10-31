@@ -37,7 +37,7 @@ module top_uart
 
     uart_rx #(
         .NB_DATA        (NB_DATA)       ,
-        .NB_OP          (NB_OP)         ,
+        //.NB_OP          (NB_OP)         ,
         .F_RX_PARITY    (F_RX_PARITY)   ,
         .F_RX_STOP_BITS (F_RX_STOP_BITS),
         .F_RX_SYNC      (F_RX_SYNC)
@@ -55,7 +55,7 @@ module top_uart
     
     uart_tx #(
         .NB_DATA        (NB_DATA)       ,
-        .NB_OP          (NB_OP)         ,
+        //.NB_OP          (NB_OP)         ,
         .F_RX_PARITY    (F_RX_PARITY)   ,
         .F_RX_STOP_BITS (F_RX_STOP_BITS),
         .F_RX_SYNC      (F_RX_SYNC)
